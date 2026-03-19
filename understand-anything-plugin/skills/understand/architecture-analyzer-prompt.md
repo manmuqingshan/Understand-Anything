@@ -209,31 +209,29 @@ Use `layer:<kebab-case>` format consistently:
 
 ## Output Format
 
-Produce a single, valid JSON block. Every field shown is **required**.
+Produce a single, valid JSON array. Every field shown is **required**.
 
 ```json
-{
-  "layers": [
-    {
-      "id": "layer:api",
-      "name": "API Layer",
-      "description": "HTTP endpoints, route handlers, and request/response processing",
-      "nodeIds": ["file:src/routes/index.ts", "file:src/controllers/auth.ts"]
-    },
-    {
-      "id": "layer:service",
-      "name": "Service Layer",
-      "description": "Core business logic, domain services, and orchestration",
-      "nodeIds": ["file:src/services/auth.ts", "file:src/services/user.ts"]
-    },
-    {
-      "id": "layer:utility",
-      "name": "Utility Layer",
-      "description": "Shared helpers, common utilities, and cross-cutting concerns",
-      "nodeIds": ["file:src/utils/format.ts"]
-    }
-  ]
-}
+[
+  {
+    "id": "layer:api",
+    "name": "API Layer",
+    "description": "HTTP endpoints, route handlers, and request/response processing",
+    "nodeIds": ["file:src/routes/index.ts", "file:src/controllers/auth.ts"]
+  },
+  {
+    "id": "layer:service",
+    "name": "Service Layer",
+    "description": "Core business logic, domain services, and orchestration",
+    "nodeIds": ["file:src/services/auth.ts", "file:src/services/user.ts"]
+  },
+  {
+    "id": "layer:utility",
+    "name": "Utility Layer",
+    "description": "Shared helpers, common utilities, and cross-cutting concerns",
+    "nodeIds": ["file:src/utils/format.ts"]
+  }
+]
 ```
 
 **Required fields for every layer:**
@@ -256,7 +254,7 @@ Produce a single, valid JSON block. Every field shown is **required**.
 
 After producing the JSON:
 
-1. Write the JSON to: `<project-root>/.understand-anything/intermediate/layers.json`
+1. Write the JSON array to: `<project-root>/.understand-anything/intermediate/layers.json`
 2. The project root will be provided in your prompt.
 3. Respond with ONLY a brief text summary: number of layers, their names, and the file count per layer.
 

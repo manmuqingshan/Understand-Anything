@@ -196,6 +196,31 @@ Pass these parameters in the dispatch prompt:
 
 After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermediate/layers.json` to get the layer assignments.
 
+`layers.json` may be either:
+- a top-level JSON array of layer objects, or
+- an envelope object such as `{ "layers": [...] }` from the current prompt/template output
+
+Normalize either form into a final top-level `layers` array before assembling the graph. Each final saved layer object MUST match this exact shape:
+
+```json
+[
+  {
+    "id": "layer:<kebab-case-name>",
+    "name": "<layer name>",
+    "description": "<what belongs in this layer>",
+    "nodeIds": ["file:src/App.tsx", "file:src/main.tsx"]
+  }
+]
+```
+
+Rules:
+- `id` is required and must be unique
+- `nodeIds` is required and must contain graph node IDs, not raw file paths
+- If the intermediate output is an envelope object, unwrap its `layers` array before any other normalization
+- If the subagent returns file paths, convert them to file node IDs before assembling the final graph
+- Drop any `nodeIds` that do not exist in the merged node set
+- Do not use a `nodes` field in the final saved layer objects
+
 **For incremental updates:** Always re-run architecture analysis on the full merged node set, since layer assignments may shift when files change.
 
 **Context for incremental updates:** When re-running architecture analysis, also inject the previous layer definitions:
@@ -249,6 +274,49 @@ Pass these parameters in the dispatch prompt:
 
 After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermediate/tour.json` to get the tour steps.
 
+`tour.json` may be either:
+- a top-level JSON array of tour step objects, or
+- an envelope object such as `{ "steps": [...] }` from the current prompt/template output
+
+Normalize either form into a final top-level `tour` array before assembling the graph. Each final saved tour step object MUST match this exact shape:
+
+```json
+[
+  {
+    "order": 1,
+    "title": "Start at the app entry",
+    "description": "This step explains how the frontend boots and mounts.",
+    "nodeIds": ["file:src/main.tsx", "file:src/App.tsx"]
+  }
+]
+```
+
+Rules:
+- If the intermediate output is an envelope object, unwrap its `steps` array before any other normalization
+- `description` is required; do not use `whyItMatters` in the final saved tour steps
+- `nodeIds` is required; do not use `nodesToInspect` in the final saved tour steps
+- `nodeIds` must reference existing graph node IDs
+- Preserve optional `languageLesson` when present
+- Sort by `order` before saving
+
+---
+
+## Phase 5.5 — NORMALIZE
+
+Before assembling the final graph:
+
+- Unwrap legacy or prompt-shaped envelopes before field renaming:
+  - `{ "layers": [...] }` -> use the contained array as the working `layers` value
+  - `{ "steps": [...] }` -> use the contained array as the working `tour` value
+- Convert any layer `nodes` field to `nodeIds`
+- Convert any tour `nodesToInspect` field to `nodeIds`
+- Convert any tour `whyItMatters` field to `description`
+- If layers or tour reference file paths, map them to file node IDs using the `file:<relative-path>` convention
+- Synthesize missing layer IDs as `layer:<kebab-case-name>`
+- Drop unresolved layer and tour node references
+- Ensure the final `layers` value is an array of `{ id, name, description, nodeIds }`
+- Ensure the final `tour` value is an array of `{ order, title, description, nodeIds }`, preserving optional `languageLesson`
+
 ---
 
 ## Phase 6 — REVIEW
@@ -273,9 +341,18 @@ Assemble the full KnowledgeGraph JSON object:
 }
 ```
 
-1. Write the assembled graph to `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`.
+1. Before writing the assembled graph, validate that:
+   - `layers` is an array of objects with these required fields: `id`, `name`, `description`, `nodeIds`
+   - `tour` is an array of objects with these required fields: `order`, `title`, `description`, `nodeIds`
+   - `tour[*].languageLesson` is allowed as an optional string field
+   - Every `layers[*].nodeIds` entry exists in the merged node set
+   - Every `tour[*].nodeIds` entry exists in the merged node set
 
-2. Dispatch a subagent using the prompt template at `./graph-reviewer-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
+   If validation fails, automatically normalize and rewrite the graph into this shape before saving. If the graph still fails final validation after the normalization pass, save it with warnings but mark dashboard auto-launch as skipped.
+
+2. Write the assembled graph to `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`.
+
+3. Dispatch a subagent using the prompt template at `./graph-reviewer-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
 
 > **Additional context from main session:**
 >
@@ -296,17 +373,18 @@ Pass these parameters in the dispatch prompt:
    > Read the file and validate it for completeness and correctness.
    > Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/review.json`
 
-3. After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermediate/review.json`.
+4. After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermediate/review.json`.
 
-4. **If `approved: false`:**
+5. **If `approved: false`:**
    - Review the `issues` list
    - Apply automated fixes where possible:
      - Remove edges with dangling references
      - Fill missing required fields with sensible defaults (e.g., empty `tags` -> `["untagged"]`, empty `summary` -> `"No summary available"`)
      - Remove nodes with invalid types
-   - If critical issues remain after one fix attempt, save the graph anyway but include the warnings in the final report
+   - Re-run the final graph validation after automated fixes
+   - If critical issues remain after one fix attempt, save the graph anyway but include the warnings in the final report and mark dashboard auto-launch as skipped
 
-5. **If `approved: true`:** Proceed to Phase 7.
+6. **If `approved: true`:** Proceed to Phase 7.
 
 ---
 
@@ -339,7 +417,8 @@ Pass these parameters in the dispatch prompt:
    - Any warnings from the reviewer
    - Path to the output file: `$PROJECT_ROOT/.understand-anything/knowledge-graph.json`
 
-5. Automatically launch the dashboard by invoking the `/understand-dashboard` skill.
+5. Only automatically launch the dashboard by invoking the `/understand-dashboard` skill if final graph validation passed after normalization/review fixes.
+   If final validation did not pass, report that the graph was saved with warnings and dashboard launch was skipped.
 
 ---
 
