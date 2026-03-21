@@ -54,7 +54,7 @@ Determine whether to run a full analysis or incremental update.
      find $PROJECT_ROOT -maxdepth 2 -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' | head -100
      ```
      Store as `$DIR_TREE`.
-   - Detect the project entry point by checking for common patterns: `src/index.ts`, `src/main.ts`, `src/App.tsx`, `main.py`, `main.go`, `src/main.rs`, `index.js`. Store first match as `$ENTRY_POINT`.
+   - Detect the project entry point by checking for common patterns (in order): `src/index.ts`, `src/main.ts`, `src/App.tsx`, `index.js`, `main.py`, `manage.py`, `app.py`, `wsgi.py`, `asgi.py`, `run.py`, `__main__.py`, `main.go`, `src/main.rs`. Store first match as `$ENTRY_POINT`.
 
 ---
 
@@ -98,7 +98,7 @@ After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermedi
 
 Batch the file list from Phase 1 into groups of **5-10 files each** (aim for balanced batch sizes).
 
-For each batch, dispatch a subagent using the prompt template at `./file-analyzer-prompt.md`. Run up to **3 subagents concurrently** using parallel dispatch. Read the template once, then for each batch pass the full template content as the subagent's prompt, appending the following additional context:
+For each batch, dispatch a subagent using the prompt template at `./file-analyzer-prompt.md`. Run up to **3 subagents concurrently** using parallel dispatch. Read the template once. If any detected framework is `Django`, also read `./django-analyzer-addendum.md` and append its full content after the base template. If any detected framework is `FastAPI` or `Flask`, also read `./fastapi-analyzer-addendum.md` and append its full content after the base template. Then for each batch pass the combined template content as the subagent's prompt, appending the following additional context:
 
 > **Additional context from main session:**
 >
@@ -109,7 +109,9 @@ For each batch, dispatch a subagent using the prompt template at `./file-analyze
 > Framework-specific guidance:
 > - If React/Next.js: files in `app/` or `pages/` are routes, `components/` are UI, `lib/` or `utils/` are utilities
 > - If Express/Fastify: files in `routes/` are API endpoints, `middleware/` is middleware, `models/` or `db/` is data
-> - If Python Django: `views.py` are controllers, `models.py` is data, `urls.py` is routing, `templates/` is UI
+> - If Python Django: `views.py` are controllers, `models.py` is data, `urls.py` is routing, `templates/` is UI, `serializers.py` is API serialization, `signals.py` is event wiring, `admin.py` is admin registration, `migrations/` is schema history
+> - If Python FastAPI: files with `@router.get/post/...` decorators are endpoints, `schemas.py` or `models.py` with Pydantic classes are request/response types, `dependencies.py` or `deps.py` holds `Depends()` providers, `routers/` or `api/` groups route modules
+> - If Python Flask: files with `@app.route` or `@blueprint.route` are endpoints, `blueprints/` or `views/` groups route modules, `models.py` with SQLAlchemy classes is data
 > - If Go: `cmd/` is entry points, `internal/` is private packages, `pkg/` is public packages
 >
 > Use this context to produce more accurate summaries and better classify file roles.
@@ -158,7 +160,7 @@ Merge all file-analyzer results into a single set of nodes and edges. Then perfo
 
 ## Phase 4 — ARCHITECTURE
 
-Dispatch a subagent using the prompt template at `./architecture-analyzer-prompt.md`. Read the template file and pass the full content as the subagent's prompt, appending the following additional context:
+Dispatch a subagent using the prompt template at `./architecture-analyzer-prompt.md`. If any detected framework is `Django`, also read `./django-analyzer-addendum.md` and append its full content after the base template. If any detected framework is `FastAPI` or `Flask`, also read `./fastapi-analyzer-addendum.md` and append its full content after the base template. Pass the combined content as the subagent's prompt, appending the following additional context:
 
 > **Additional context from main session:**
 >
@@ -172,7 +174,9 @@ Dispatch a subagent using the prompt template at `./architecture-analyzer-prompt
 > Framework-specific layer hints:
 > - If React/Next.js: `app/` or `pages/` → UI Layer, `api/` → API Layer, `lib/` → Service Layer, `components/` → UI Layer
 > - If Express: `routes/` → API Layer, `controllers/` → Service Layer, `models/` → Data Layer, `middleware/` → Middleware Layer
-> - If Python Django: `views/` → API Layer, `models/` → Data Layer, `templates/` → UI Layer, `management/` → CLI Layer
+> - If Python Django: `views/` or `views.py` → API Layer, `models/` or `models.py` → Data Layer, `templates/` → UI Layer, `management/` → CLI Layer, `serializers.py` → API Layer, `signals.py` → Event Layer, `migrations/` → Data Layer
+> - If Python FastAPI: files with router decorators → API Layer, Pydantic schema files → Types Layer, `dependencies.py` or `deps.py` → Service Layer, `routers/` or `api/` → API Layer, database session/engine files → Data Layer
+> - If Python Flask: files with `@blueprint.route` → API Layer, `models.py` → Data Layer, `forms.py` → UI Layer, `extensions.py` → Config Layer
 > - If Go: `cmd/` → Entry Points, `internal/` → Service Layer, `pkg/` → Shared Library, `api/` → API Layer
 >
 > Use the directory tree and framework hints to inform layer assignments. Directory structure is strong evidence for layer boundaries.

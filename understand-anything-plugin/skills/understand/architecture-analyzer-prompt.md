@@ -82,11 +82,18 @@ Classify each directory name against known architectural patterns:
 | `hooks` | `hooks` |
 | `store`, `state`, `reducers`, `actions`, `slices` | `state` |
 | `assets`, `static`, `public` | `assets` |
+| `migrations` | `data` |
+| `management`, `commands` | `config` |
+| `templatetags` | `utility` |
+| `signals` | `service` |
+| `serializers` | `api` |
 
 Also check file-level patterns:
-- Files matching `*.test.*` or `*.spec.*` -> `test`
-- Files matching `*.d.ts` -> `types`
-- Files named `index.ts`/`index.js` at a package root -> `entry`
+- Files matching `*.test.*` or `*.spec.*` or `test_*.py` -> `test`
+- Files matching `*.d.ts` -> `types` (TypeScript declaration files only)
+- Files named `index.ts`, `index.js`, or `__init__.py` at a package/directory root -> `entry`
+- Files named `manage.py` at the project root -> `entry` (Django management entry point)
+- Files named `wsgi.py` or `asgi.py` -> `config` (Python WSGI/ASGI server config)
 
 **F. Dependency Direction**
 

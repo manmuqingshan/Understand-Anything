@@ -81,7 +81,9 @@ Read config files (if they exist) and extract framework information:
 - `tsconfig.json` -- if present, confirms TypeScript usage
 - `Cargo.toml` -- if present, confirms Rust project; extract `[package].name`
 - `go.mod` -- if present, confirms Go project; extract module name
-- `requirements.txt` / `pyproject.toml` / `setup.py` / `Pipfile` -- if present, confirms Python project
+- `requirements.txt` -- if present, confirms Python project; read line by line and match package names (strip version specifiers) against known Python frameworks: `django`, `djangorestframework`, `fastapi`, `flask`, `sqlalchemy`, `alembic`, `celery`, `pydantic`, `uvicorn`, `gunicorn`, `aiohttp`, `tornado`, `starlette`, `pytest`, `hypothesis`, `channels`
+- `pyproject.toml` -- if present, confirms Python project; parse the `[project].dependencies` or `[tool.poetry.dependencies]` section and apply the same Python framework keyword matching as above. Also check for `[tool.pytest.ini_options]` (confirms pytest) and `[tool.django]` (confirms Django).
+- `setup.py` / `setup.cfg` / `Pipfile` -- if present, confirms Python project; read and apply Python framework keyword matching
 - `Gemfile` -- if present, confirms Ruby project
 - `pom.xml` / `build.gradle` -- if present, confirms Java project
 
@@ -99,7 +101,8 @@ Extract from (in priority order):
 1. `package.json` `name` field
 2. `Cargo.toml` `[package].name`
 3. `go.mod` module path (last segment)
-4. Directory name of project root
+4. `pyproject.toml` -- check `[project].name` first, then `[tool.poetry].name`
+5. Directory name of project root
 
 ### Script Output Format
 

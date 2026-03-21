@@ -125,7 +125,10 @@ ENDJSON
 After writing the script, execute it. **Use the batch index in every temp file path** — multiple file-analyzer agents run in parallel and must not overwrite each other's files:
 
 ```bash
+# For Node.js scripts:
 node /tmp/ua-file-extract-<batchIndex>.js /tmp/ua-file-analyzer-input-<batchIndex>.json /tmp/ua-file-extract-results-<batchIndex>.json
+# For Python scripts:
+python3 /tmp/ua-file-extract-<batchIndex>.py /tmp/ua-file-analyzer-input-<batchIndex>.json /tmp/ua-file-extract-results-<batchIndex>.json
 ```
 
 If the script exits with a non-zero code, read stderr, diagnose the issue, fix the script, and re-run. You have up to 2 retry attempts.
@@ -166,7 +169,9 @@ Indicators from script data:
 - Filename contains `.test.` or `.spec.` = `test`
 - Exports a class with `Handler` or `Controller` in the name = `api-handler`
 - Only type/interface exports = `type-definition`
-- Named `index.ts` at a directory root with re-exports = `entry-point`
+- Named `index.ts` or `index.js` at a directory root with re-exports = `entry-point` (JavaScript/TypeScript barrel)
+- Named `__init__.py` at a package root with imports or re-exports = `entry-point` (Python package barrel)
+- Named `manage.py` = `entry-point` (Django management script)
 
 **Language Notes** (optional, your expert judgment):
 If the structural data reveals notable language-specific patterns (e.g., many generic type parameters, decorator usage, complex trait bounds), add a brief `languageNotes` string. Only add this when genuinely educational.

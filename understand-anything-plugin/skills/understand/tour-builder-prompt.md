@@ -46,7 +46,7 @@ For every node, count how many other nodes it has edges pointing TO (fan-out). H
 **C. Entry Point Candidates**
 
 Identify likely entry points using these signals (score each file node, sum the scores):
-- Filename matches `index.ts`, `index.js`, `main.ts`, `main.js`, `app.ts`, `app.js`, `server.ts`, `server.js`, `mod.rs`, `main.go`, `main.py`, `main.rs` -> +3 points
+- Filename matches `index.ts`, `index.js`, `main.ts`, `main.js`, `app.ts`, `app.js`, `server.ts`, `server.js`, `mod.rs`, `main.go`, `main.py`, `main.rs`, `manage.py`, `app.py`, `wsgi.py`, `asgi.py`, `run.py`, `__main__.py` -> +3 points
 - Node tags contain `entry-point` or `barrel` -> +2 points
 - File is at the project root or one level deep (e.g., `src/index.ts`) -> +1 point
 - High fan-out (top 10%) -> +1 point
