@@ -851,17 +851,17 @@ Per project convention, all four version files must stay in sync when changes ar
 node -e "const p = require('./understand-anything-plugin/package.json'); console.log(p.version)"
 ```
 
-Expected: `1.0.1` (or whatever the current version is).
+Expected: `1.2.1` (or whatever the current version is).
 
 ### Step 2: Bump patch version in all four files
 
-New version: `1.0.2` (patch bump — internal optimization, no API changes).
+New version: `1.2.2` (patch bump — internal optimization, no API changes).
 
 Update each file:
-- `understand-anything-plugin/package.json`: `"version": "1.0.2"`
-- `.claude-plugin/marketplace.json`: `"version": "1.0.2"` in `plugins[0]`
-- `.claude-plugin/plugin.json`: `"version": "1.0.2"`
-- `.cursor-plugin/plugin.json`: `"version": "1.0.2"`
+- `understand-anything-plugin/package.json`: `"version": "1.2.2"`
+- `.claude-plugin/marketplace.json`: `"version": "1.2.2"` in `plugins[0]`
+- `.claude-plugin/plugin.json`: `"version": "1.2.2"`
+- `.cursor-plugin/plugin.json`: `"version": "1.2.2"`
 
 ### Step 3: Verify all four files match
 
@@ -869,7 +869,7 @@ Update each file:
 grep -r '"version"' understand-anything-plugin/package.json .claude-plugin/marketplace.json .claude-plugin/plugin.json .cursor-plugin/plugin.json
 ```
 
-All four should show `"version": "1.0.2"`.
+All four should show `"version": "1.2.2"`.
 
 ### Step 4: Commit
 
@@ -878,7 +878,7 @@ git add understand-anything-plugin/package.json \
         .claude-plugin/marketplace.json \
         .claude-plugin/plugin.json \
         .cursor-plugin/plugin.json
-git commit -m "chore: bump version to 1.0.2"
+git commit -m "chore: bump version to 1.2.2"
 ```
 
 ---
