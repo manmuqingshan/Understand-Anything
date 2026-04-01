@@ -152,16 +152,16 @@ After batches complete, merge with the existing graph:
 
 Merge all file-analyzer results into a single set of nodes and edges. Then perform normalization and integrity cleanup **in this order**:
 
-1. **Normalize node IDs:** For every node, verify the `id` field follows the convention `<type-prefix>:<path>` where type-prefix is one of `file`, `func`, `class`, `module`, `concept`. Apply these fixes:
+1. **Normalize node IDs:** For every node, verify the `id` field follows the convention `<type-prefix>:<path>` where type-prefix is one of `file`, `func`, `class`, `module`, `concept`, `config`, `document`, `service`, `table`, `endpoint`, `pipeline`, `schema`, `resource`. Apply these fixes:
    - If the ID has a double prefix (e.g., `file:file:src/foo.ts`), strip the duplicate prefix.
    - If the ID has a project-name prefix (e.g., `my-project:file:src/foo.ts`), strip the project-name portion.
    - If the ID is a bare file path with no prefix, add the appropriate prefix based on the node's `type` field: `file` → `file:<path>`, `function` → `func:<filePath>:<name>`, `class` → `class:<filePath>:<name>`.
    - Build a mapping of original IDs → corrected IDs.
 
 2. **Normalize complexity values:** For every node, verify `complexity` is one of `"simple"`, `"moderate"`, `"complex"`. Apply these mappings for invalid values:
-   - `"low"`, `"easy"`, `"trivial"`, `"basic"` → `"simple"`
-   - `"medium"`, `"mid"`, `"average"` → `"moderate"`
-   - `"high"`, `"hard"`, `"difficult"`, `"advanced"` → `"complex"`
+   - `"low"`, `"easy"` → `"simple"`
+   - `"medium"`, `"intermediate"` → `"moderate"`
+   - `"high"`, `"hard"`, `"difficult"` → `"complex"`
    - Numeric 1-3 → `"simple"`, 4-6 → `"moderate"`, 7-10 → `"complex"`
    - Any other value → `"moderate"`
 

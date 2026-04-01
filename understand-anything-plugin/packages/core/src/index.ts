@@ -14,6 +14,7 @@ export {
   normalizeNodeId,
   normalizeComplexity,
   normalizeBatchOutput,
+  type DroppedEdge,
   type NormalizationStats,
   type NormalizeBatchResult,
 } from "./analyzer/normalize-graph.js";

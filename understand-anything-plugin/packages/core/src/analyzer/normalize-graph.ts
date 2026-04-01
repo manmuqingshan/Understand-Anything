@@ -1,6 +1,8 @@
-import type { GraphNode, GraphEdge } from "../types.js";
-
-const VALID_PREFIXES = new Set(["file", "func", "class", "module", "concept"]);
+const VALID_PREFIXES = new Set([
+  "file", "func", "class", "module", "concept",
+  "config", "document", "service", "table", "endpoint",
+  "pipeline", "schema", "resource",
+]);
 
 const TYPE_TO_PREFIX: Record<string, string> = {
   file: "file",
@@ -8,6 +10,14 @@ const TYPE_TO_PREFIX: Record<string, string> = {
   class: "class",
   module: "module",
   concept: "concept",
+  config: "config",
+  document: "document",
+  service: "service",
+  table: "table",
+  endpoint: "endpoint",
+  pipeline: "pipeline",
+  schema: "schema",
+  resource: "resource",
 };
 
 /**
@@ -79,8 +89,6 @@ export function normalizeNodeId(
 
 const VALID_COMPLEXITIES = new Set(["simple", "moderate", "complex"]);
 
-// String aliases for complexity — mirrors upstream's COMPLEXITY_ALIASES.
-// After rebasing onto upstream main, this can be replaced with an import.
 const COMPLEXITY_STRING_MAP: Record<string, string> = {
   low: "simple",
   easy: "simple",
@@ -115,16 +123,24 @@ export function normalizeComplexity(
   return "moderate";
 }
 
+export interface DroppedEdge {
+  source: string;
+  target: string;
+  type: string;
+  reason: "missing-source" | "missing-target" | "missing-both";
+}
+
 export interface NormalizationStats {
   idsFixed: number;
   complexityFixed: number;
   edgesRewritten: number;
   danglingEdgesDropped: number;
+  droppedEdges: DroppedEdge[];
 }
 
 export interface NormalizeBatchResult {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
+  nodes: Record<string, unknown>[];
+  edges: Record<string, unknown>[];
   idMap: Map<string, string>;
   stats: NormalizationStats;
 }
@@ -146,6 +162,7 @@ export function normalizeBatchOutput(data: {
     complexityFixed: 0,
     edgesRewritten: 0,
     danglingEdgesDropped: 0,
+    droppedEdges: [],
   };
 
   const idMap = new Map<string, string>();
@@ -191,15 +208,34 @@ export function normalizeBatchOutput(data: {
   for (const raw of data.edges) {
     const oldSource = String(raw.source ?? "");
     const oldTarget = String(raw.target ?? "");
-    const newSource = idMap.get(oldSource) ?? oldSource;
-    const newTarget = idMap.get(oldTarget) ?? oldTarget;
+    let newSource = idMap.get(oldSource) ?? oldSource;
+    let newTarget = idMap.get(oldTarget) ?? oldTarget;
+
+    // Fallback: if endpoint not found in idMap, normalize it directly
+    // (handles cross-variant malformed IDs between nodes and edges)
+    if (!validNodeIds.has(newSource)) {
+      const normalized = normalizeNodeId(newSource, { type: "file" });
+      if (validNodeIds.has(normalized)) newSource = normalized;
+    }
+    if (!validNodeIds.has(newTarget)) {
+      const normalized = normalizeNodeId(newTarget, { type: "file" });
+      if (validNodeIds.has(normalized)) newTarget = normalized;
+    }
 
     if (newSource !== oldSource || newTarget !== oldTarget) {
       stats.edgesRewritten++;
     }
 
     if (!validNodeIds.has(newSource) || !validNodeIds.has(newTarget)) {
+      const missingSource = !validNodeIds.has(newSource);
+      const missingTarget = !validNodeIds.has(newTarget);
       stats.danglingEdgesDropped++;
+      stats.droppedEdges.push({
+        source: newSource,
+        target: newTarget,
+        type: String(raw.type ?? ""),
+        reason: missingSource && missingTarget ? "missing-both" : missingSource ? "missing-source" : "missing-target",
+      });
       continue;
     }
 
@@ -213,8 +249,8 @@ export function normalizeBatchOutput(data: {
   }
 
   return {
-    nodes: deduped as unknown as GraphNode[],
-    edges: edges as unknown as GraphEdge[],
+    nodes: deduped,
+    edges,
     idMap,
     stats,
   };

@@ -4,6 +4,7 @@ import {
   normalizeComplexity,
   normalizeBatchOutput,
 } from "../analyzer/normalize-graph.js";
+import { validateGraph } from "../schema.js";
 
 describe("normalizeNodeId", () => {
   it("passes through a correct file ID unchanged", () => {
@@ -83,12 +84,12 @@ describe("normalizeNodeId", () => {
     ).toBe("concept:caching");
   });
 
-  it("handles double project-name prefix", () => {
+  it("handles project-name prefix before a valid non-code prefix", () => {
     expect(
       normalizeNodeId("my-project:service:docker-compose.yml", {
         type: "file",
       }),
-    ).toBe("file:docker-compose.yml");
+    ).toBe("service:docker-compose.yml");
   });
 
   it("returns empty string for empty input", () => {
@@ -97,6 +98,26 @@ describe("normalizeNodeId", () => {
 
   it("falls back to untouched ID for unknown node type", () => {
     expect(normalizeNodeId("some-id", { type: "widget" as any })).toBe("some-id");
+  });
+
+  it("passes through non-code type IDs unchanged", () => {
+    expect(normalizeNodeId("config:tsconfig.json", { type: "config" })).toBe("config:tsconfig.json");
+    expect(normalizeNodeId("document:README.md", { type: "document" })).toBe("document:README.md");
+    expect(normalizeNodeId("service:docker-compose.yml", { type: "service" })).toBe("service:docker-compose.yml");
+    expect(normalizeNodeId("table:migrations/001.sql:users", { type: "table" })).toBe("table:migrations/001.sql:users");
+    expect(normalizeNodeId("endpoint:src/routes.ts:GET /api/users", { type: "endpoint" })).toBe("endpoint:src/routes.ts:GET /api/users");
+    expect(normalizeNodeId("pipeline:.github/workflows/ci.yml", { type: "pipeline" })).toBe("pipeline:.github/workflows/ci.yml");
+    expect(normalizeNodeId("schema:schema.graphql", { type: "schema" })).toBe("schema:schema.graphql");
+    expect(normalizeNodeId("resource:main.tf", { type: "resource" })).toBe("resource:main.tf");
+  });
+
+  it("adds prefix for bare paths with non-code types", () => {
+    expect(normalizeNodeId("tsconfig.json", { type: "config" })).toBe("config:tsconfig.json");
+    expect(normalizeNodeId("README.md", { type: "document" })).toBe("document:README.md");
+  });
+
+  it("strips project-name prefix from non-code type IDs", () => {
+    expect(normalizeNodeId("my-project:config:tsconfig.json", { type: "config" })).toBe("config:tsconfig.json");
   });
 });
 
@@ -257,6 +278,13 @@ describe("normalizeBatchOutput", () => {
 
     expect(result.edges).toHaveLength(0);
     expect(result.stats.danglingEdgesDropped).toBe(1);
+    expect(result.stats.droppedEdges).toHaveLength(1);
+    expect(result.stats.droppedEdges[0]).toEqual({
+      source: "file:src/a.ts",
+      target: "file:src/nonexistent.ts",
+      type: "imports",
+      reason: "missing-target",
+    });
   });
 
   it("deduplicates nodes keeping last occurrence", () => {
@@ -371,5 +399,100 @@ describe("normalizeBatchOutput", () => {
     expect(result.stats.edgesRewritten).toBe(1);
     expect(result.stats.danglingEdgesDropped).toBe(1);
     expect(result.edges).toHaveLength(1);
+  });
+
+  it("resolves edge endpoints with different malformed variants than node IDs", () => {
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "src/bare.ts",
+          type: "file",
+          name: "bare.ts",
+          filePath: "src/bare.ts",
+          summary: "Bare",
+          tags: [],
+          complexity: "simple",
+        },
+        {
+          id: "file:src/target.ts",
+          type: "file",
+          name: "target.ts",
+          filePath: "src/target.ts",
+          summary: "Target",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "my-project:file:src/bare.ts",
+          target: "file:src/target.ts",
+          type: "imports",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    expect(result.edges).toHaveLength(1);
+    expect(result.edges[0].source).toBe("file:src/bare.ts");
+    expect(result.edges[0].target).toBe("file:src/target.ts");
+  });
+});
+
+describe("normalizeBatchOutput integration", () => {
+  it("produces output that passes validateGraph after wrapping", () => {
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "my-project:file:src/index.ts",
+          type: "file",
+          name: "index.ts",
+          filePath: "src/index.ts",
+          summary: "Entry point",
+          tags: ["entry"],
+          complexity: 3,
+        },
+        {
+          id: "src/utils.ts",
+          type: "file",
+          name: "utils.ts",
+          filePath: "src/utils.ts",
+          summary: "Utilities",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "my-project:file:src/index.ts",
+          target: "src/utils.ts",
+          type: "imports",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    const graph = {
+      version: "1.0.0",
+      project: {
+        name: "test",
+        languages: ["typescript"],
+        frameworks: [],
+        description: "Test project",
+        analyzedAt: new Date().toISOString(),
+        gitCommitHash: "abc123",
+      },
+      nodes: result.nodes,
+      edges: result.edges,
+      layers: [],
+      tour: [],
+    };
+
+    const validation = validateGraph(graph);
+    expect(validation.success).toBe(true);
+    expect(validation.data?.nodes).toHaveLength(2);
+    expect(validation.data?.edges).toHaveLength(1);
   });
 });
