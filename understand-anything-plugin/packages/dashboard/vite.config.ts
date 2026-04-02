@@ -44,6 +44,7 @@ export default defineConfig({
           const pathname = url.pathname;
           const isProtectedEndpoint =
             pathname === "/knowledge-graph.json" ||
+            pathname === "/domain-graph.json" ||
             pathname === "/diff-overlay.json" ||
             pathname === "/meta.json";
 
@@ -66,6 +67,8 @@ export default defineConfig({
               ? "diff-overlay.json"
               : pathname === "/meta.json"
               ? "meta.json"
+              : pathname === "/domain-graph.json"
+              ? "domain-graph.json"
               : "knowledge-graph.json";
 
           const graphDir = process.env.GRAPH_DIR;
