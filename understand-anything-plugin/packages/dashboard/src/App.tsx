@@ -24,13 +24,31 @@ import { ThemeProvider } from "./themes/index.ts";
 import { ThemePicker } from "./components/ThemePicker.tsx";
 import type { ThemeConfig } from "./themes/index.ts";
 
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 const SESSION_TOKEN_KEY = "understand-anything-token";
+
+/** Resolve data file URL — in demo mode, use env var URLs; otherwise use local paths with token. */
+function dataUrl(fileName: string, token: string | null): string {
+  if (DEMO_MODE) {
+    const envMap: Record<string, string | undefined> = {
+      "knowledge-graph.json": import.meta.env.VITE_GRAPH_URL,
+      "domain-graph.json": import.meta.env.VITE_DOMAIN_GRAPH_URL,
+      "meta.json": import.meta.env.VITE_META_URL,
+      "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
+    };
+    const url = envMap[fileName];
+    if (url) return url;
+  }
+  const path = `/${fileName}`;
+  return token ? `${path}?token=${encodeURIComponent(token)}` : path;
+}
 
 /**
  * Resolve the access token from the URL query string or sessionStorage.
  * If found in the URL, persist to sessionStorage and strip the param from the address bar.
  */
 function resolveInitialToken(): string | null {
+  if (DEMO_MODE) return "__demo__";
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get("token");
   if (urlToken) {
@@ -46,11 +64,6 @@ function resolveInitialToken(): string | null {
   return sessionStorage.getItem(SESSION_TOKEN_KEY);
 }
 
-/** Build a URL with the token query param appended. */
-function tokenUrl(path: string, token: string | null): string {
-  return token ? `${path}?token=${encodeURIComponent(token)}` : path;
-}
-
 function App() {
   const [accessToken, setAccessToken] = useState<string | null>(resolveInitialToken);
 
@@ -58,6 +71,11 @@ function App() {
     sessionStorage.setItem(SESSION_TOKEN_KEY, token);
     setAccessToken(token);
   }, []);
+
+  // In demo mode, skip token gate entirely
+  if (DEMO_MODE) {
+    return <Dashboard accessToken="__demo__" />;
+  }
 
   // Show the token gate when no token is available
   if (accessToken === null) {
@@ -90,7 +108,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const setDomainGraph = useDashboardStore((s) => s.setDomainGraph);
 
   useEffect(() => {
-    fetch(tokenUrl("/meta.json", accessToken))
+    fetch(dataUrl("meta.json", accessToken))
       .then((r) => (r.ok ? r.json() : null))
       .then((meta) => {
         if (meta?.theme) setMetaTheme(meta.theme);
@@ -215,7 +233,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   useKeyboardShortcuts(shortcuts);
 
   useEffect(() => {
-    fetch(tokenUrl("/knowledge-graph.json", accessToken))
+    fetch(dataUrl("knowledge-graph.json", accessToken))
       .then((res) => res.json())
       .then((data: unknown) => {
         const result = validateGraph(data);
@@ -244,7 +262,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setGraph]);
 
   useEffect(() => {
-    fetch(tokenUrl("/diff-overlay.json", accessToken))
+    fetch(dataUrl("diff-overlay.json", accessToken))
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
@@ -270,7 +288,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setDiffOverlay]);
 
   useEffect(() => {
-    fetch(tokenUrl("/domain-graph.json", accessToken))
+    fetch(dataUrl("domain-graph.json", accessToken))
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
