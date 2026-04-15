@@ -10,6 +10,7 @@ import type {
   ResourceInfo,
   SectionInfo,
 } from "../types.js";
+import { LanguageRegistry } from "../languages/language-registry.js";
 
 interface FileMeta {
   summary: string;
@@ -56,72 +57,6 @@ const KIND_TO_NODE_TYPE: Record<string, GraphNode["type"]> = {
   output: "config",
 };
 
-const EXTENSION_LANGUAGE: Record<string, string> = {
-  // Code languages
-  ".ts": "typescript",
-  ".tsx": "typescript",
-  ".js": "javascript",
-  ".jsx": "javascript",
-  ".mjs": "javascript",
-  ".cjs": "javascript",
-  ".py": "python",
-  ".rb": "ruby",
-  ".go": "go",
-  ".rs": "rust",
-  ".java": "java",
-  ".kt": "kotlin",
-  ".swift": "swift",
-  ".c": "c",
-  ".cpp": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".cs": "csharp",
-  ".php": "php",
-  ".lua": "lua",
-  // Non-code languages
-  ".sh": "shell",
-  ".bash": "shell",
-  ".zsh": "shell",
-  ".json": "json",
-  ".jsonc": "json",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-  ".toml": "toml",
-  ".xml": "xml",
-  ".html": "html",
-  ".htm": "html",
-  ".css": "css",
-  ".scss": "css",
-  ".less": "css",
-  ".md": "markdown",
-  ".mdx": "markdown",
-  ".sql": "sql",
-  ".graphql": "graphql",
-  ".gql": "graphql",
-  ".proto": "protobuf",
-  ".tf": "terraform",
-  ".tfvars": "terraform",
-  ".mk": "makefile",
-  ".env": "env",
-  ".csv": "csv",
-  ".tsv": "csv",
-  ".rst": "restructuredtext",
-  ".ps1": "powershell",
-  ".psm1": "powershell",
-  ".psd1": "powershell",
-  ".bat": "batch",
-  ".cmd": "batch",
-  ".txt": "plaintext",
-  ".svg": "xml",
-};
-
-function detectLanguage(filePath: string): string {
-  const lastDot = filePath.lastIndexOf(".");
-  if (lastDot === -1) return "unknown";
-  const ext = filePath.slice(lastDot).toLowerCase();
-  return EXTENSION_LANGUAGE[ext] ?? "unknown";
-}
-
 export class GraphBuilder {
   private readonly nodes: GraphNode[] = [];
   private readonly edges: GraphEdge[] = [];
@@ -130,10 +65,16 @@ export class GraphBuilder {
   private readonly edgeKeys = new Set<string>();
   private readonly projectName: string;
   private readonly gitHash: string;
+  private readonly languageRegistry: LanguageRegistry;
 
-  constructor(projectName: string, gitHash: string) {
+  constructor(projectName: string, gitHash: string, languageRegistry?: LanguageRegistry) {
     this.projectName = projectName;
     this.gitHash = gitHash;
+    this.languageRegistry = languageRegistry ?? LanguageRegistry.createDefault();
+  }
+
+  private detectLanguage(filePath: string): string {
+    return this.languageRegistry.getForFile(filePath)?.id ?? "unknown";
   }
 
   private static basename(filePath: string): string {
@@ -141,7 +82,7 @@ export class GraphBuilder {
   }
 
   addFile(filePath: string, meta: FileMeta): void {
-    const lang = detectLanguage(filePath);
+    const lang = this.detectLanguage(filePath);
     if (lang !== "unknown") {
       this.languages.add(lang);
     }
@@ -166,7 +107,7 @@ export class GraphBuilder {
     analysis: StructuralAnalysis,
     meta: FileAnalysisMeta,
   ): void {
-    const lang = detectLanguage(filePath);
+    const lang = this.detectLanguage(filePath);
     if (lang !== "unknown") {
       this.languages.add(lang);
     }
@@ -267,7 +208,7 @@ export class GraphBuilder {
   }
 
   addNonCodeFile(filePath: string, meta: NonCodeFileMeta): string {
-    const lang = detectLanguage(filePath);
+    const lang = this.detectLanguage(filePath);
     if (lang !== "unknown") this.languages.add(lang);
     const name = GraphBuilder.basename(filePath);
     const id = `${meta.nodeType ?? "file"}:${filePath}`;
