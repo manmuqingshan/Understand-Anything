@@ -11,6 +11,8 @@ export {
   type GraphIssue,
 } from "./schema.js";
 export { TreeSitterPlugin } from "./plugins/tree-sitter-plugin.js";
+export type { LanguageExtractor } from "./plugins/extractors/types.js";
+export { builtinExtractors } from "./plugins/extractors/index.js";
 export { GraphBuilder } from "./analyzer/graph-builder.js";
 export {
   buildFileAnalysisPrompt,
