@@ -1,3 +1,5 @@
+import { builtinLanguageConfigs } from "../languages/configs/index.js";
+
 export interface PluginEntry {
   name: string;
   enabled: boolean;
@@ -14,7 +16,9 @@ export const DEFAULT_PLUGIN_CONFIG: PluginConfig = {
     {
       name: "tree-sitter",
       enabled: true,
-      languages: ["typescript", "javascript"],
+      languages: builtinLanguageConfigs
+        .filter((c) => c.treeSitter)
+        .map((c) => c.id),
     },
   ],
 };

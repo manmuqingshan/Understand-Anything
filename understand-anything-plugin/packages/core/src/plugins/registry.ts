@@ -1,4 +1,4 @@
-import type { AnalyzerPlugin, StructuralAnalysis, ImportResolution } from "../types.js";
+import type { AnalyzerPlugin, StructuralAnalysis, ImportResolution, CallGraphEntry } from "../types.js";
 import { LanguageRegistry } from "../languages/language-registry.js";
 
 /**
@@ -63,6 +63,12 @@ export class PluginRegistry {
     const plugin = this.getPluginForFile(filePath);
     if (!plugin || !plugin.resolveImports) return null;
     return plugin.resolveImports(filePath, content);
+  }
+
+  extractCallGraph(filePath: string, content: string): CallGraphEntry[] | null {
+    const plugin = this.getPluginForFile(filePath);
+    if (!plugin?.extractCallGraph) return null;
+    return plugin.extractCallGraph(filePath, content);
   }
 
   getPlugins(): AnalyzerPlugin[] {
