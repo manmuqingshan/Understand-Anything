@@ -133,8 +133,8 @@ def parse_gitignore(project_root: Path) -> list[re.Pattern[str]]:
             regex = regex.rstrip("/") + "(/|$)"
         try:
             patterns.append(re.compile(regex))
-        except re.error:
-            pass
+        except re.error as e:
+            print(f"Warning: skipping invalid gitignore pattern '{line}': {e}", file=sys.stderr)
     return patterns
 
 
