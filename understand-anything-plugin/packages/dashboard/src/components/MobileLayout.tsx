@@ -10,6 +10,7 @@ import NodeInfo from "./NodeInfo";
 import ProjectOverview from "./ProjectOverview";
 import FileExplorer from "./FileExplorer";
 import WarningBanner from "./WarningBanner";
+import StalenessBanner, { type GraphFreshnessResult } from "./StalenessBanner";
 import MobileBottomNav from "./MobileBottomNav";
 import type { MobileTab } from "./MobileBottomNav";
 import MobileDrawer from "./MobileDrawer";
@@ -25,6 +26,7 @@ interface Props {
   setShowKeyboardHelp: (value: boolean) => void;
   loadError: string | null;
   allIssues: GraphIssue[];
+  graphFreshness: GraphFreshnessResult | null;
   shortcuts: import("../hooks/useKeyboardShortcuts").KeyboardShortcut[];
 }
 
@@ -34,6 +36,7 @@ export default function MobileLayout({
   setShowKeyboardHelp,
   loadError,
   allIssues,
+  graphFreshness,
   shortcuts,
 }: Props) {
   const graph = useDashboardStore((s) => s.graph);
@@ -130,6 +133,9 @@ export default function MobileLayout({
 
       {/* Search (collapsible) */}
       {searchOpen && <SearchBar />}
+
+      {/* Graph freshness warning */}
+      {!loadError && <StalenessBanner freshness={graphFreshness} />}
 
       {/* Validation warnings */}
       {allIssues.length > 0 && !loadError && <WarningBanner issues={allIssues} />}

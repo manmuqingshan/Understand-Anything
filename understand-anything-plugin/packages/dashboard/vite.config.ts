@@ -1,10 +1,11 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { getGraphFreshness } from "../core/src/staleness";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -14,10 +15,10 @@ const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
 function graphFileCandidates(fileName: string): string[] {
   const graphDir = process.env.GRAPH_DIR;
+  if (graphDir) {
+    return [path.resolve(graphDir, `.understand-anything/${fileName}`)];
+  }
   return [
-    ...(graphDir
-      ? [path.resolve(graphDir, `.understand-anything/${fileName}`)]
-      : []),
     path.resolve(process.cwd(), `.understand-anything/${fileName}`),
     path.resolve(process.cwd(), `../../../.understand-anything/${fileName}`),
   ];
@@ -176,7 +177,44 @@ function readSourceFile(url: URL) {
   };
 }
 
-export default defineConfig({
+export function readGraphFreshness() {
+  const graphFile = findGraphFile("knowledge-graph.json");
+  if (!graphFile) {
+    return rejectFileRequest("No knowledge graph found. Run /understand first.", 404);
+  }
+
+  let graph: {
+    project?: {
+      gitCommitHash?: unknown;
+      analyzedAt?: unknown;
+    };
+  };
+  try {
+    graph = JSON.parse(fs.readFileSync(graphFile, "utf-8"));
+  } catch {
+    return rejectFileRequest("Failed to read graph file", 500);
+  }
+
+  const project = graph.project;
+  return {
+    statusCode: 200,
+    payload: getGraphFreshness(projectRootFromGraphFile(graphFile), {
+      graphCommitHash:
+        typeof project?.gitCommitHash === "string" ? project.gitCommitHash : undefined,
+      lastAnalyzedAt:
+        typeof project?.analyzedAt === "string" ? project.analyzedAt : undefined,
+    }),
+  };
+}
+
+type DashboardViteConfig = UserConfig & {
+  test: {
+    environment: "node";
+    include: string[];
+  };
+};
+
+const config: DashboardViteConfig = {
   test: {
     environment: "node",
     include: ["src/**/__tests__/**/*.test.ts"],
@@ -253,6 +291,7 @@ export default defineConfig({
             pathname === "/diff-overlay.json" ||
             pathname === "/meta.json" ||
             pathname === "/config.json" ||
+            pathname === "/staleness.json" ||
             pathname === "/file-content.json";
 
           if (!isProtectedEndpoint) {
@@ -288,6 +327,12 @@ export default defineConfig({
               }
             }
             sendJson(res, 200, { autoUpdate: false, outputLanguage: "en" });
+            return;
+          }
+
+          if (pathname === "/staleness.json") {
+            const result = readGraphFreshness();
+            sendJson(res, result.statusCode, result.payload);
             return;
           }
 
@@ -359,4 +404,6 @@ export default defineConfig({
       },
     },
   ],
-});
+};
+
+export default defineConfig(config);

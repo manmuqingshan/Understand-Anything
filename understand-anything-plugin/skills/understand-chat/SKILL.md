@@ -33,22 +33,24 @@ The knowledge graph JSON has this structure:
 
 1. Check that `.understand-anything/knowledge-graph.json` exists in the current project root. If not, tell the user to run `/understand` first.
 
-2. **Read project metadata only** — use Grep or Read with a line limit to extract just the `"project"` section from the top of the file for context (name, description, languages, frameworks).
+2. **Check graph freshness** — read `project.gitCommitHash` from the graph metadata and run `git rev-parse HEAD` in the project root. If both values exist and differ, warn the user before answering that the knowledge graph may be stale and newer code may be missing from the answer. Suggest: Run `/understand` to refresh the graph. If git metadata is missing or unavailable, continue with a brief best-effort warning instead of blocking.
 
-3. **Search for relevant nodes** — use Grep to search the knowledge graph file for the user's query keywords: "$ARGUMENTS"
+3. **Read project metadata only** — use Grep or Read with a line limit to extract just the `"project"` section from the top of the file for context (name, description, languages, frameworks).
+
+4. **Search for relevant nodes** — use Grep to search the knowledge graph file for the user's query keywords: "$ARGUMENTS"
    - Search `"name"` fields: `grep -i "query_keyword"` in the graph file
    - Search `"summary"` fields for semantic matches
    - Search `"tags"` arrays for topic matches
    - Note the `id` values of all matching nodes
 
-4. **Find connected edges** — for each matched node ID, Grep for that ID in the `edges` section to find:
+5. **Find connected edges** — for each matched node ID, Grep for that ID in the `edges` section to find:
    - What it imports or depends on (downstream)
    - What calls or imports it (upstream)
    - This gives you the 1-hop subgraph around the query
 
-5. **Read layer context** — Grep for `"layers"` to understand which architectural layers the matched nodes belong to.
+6. **Read layer context** — Grep for `"layers"` to understand which architectural layers the matched nodes belong to.
 
-6. **Answer the query** using only the relevant subgraph:
+7. **Answer the query** using only the relevant subgraph:
    - Reference specific files, functions, and relationships from the graph
    - Explain which layer(s) are relevant and why
    - Be concise but thorough — link concepts to actual code locations

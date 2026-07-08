@@ -37,7 +37,7 @@ The knowledge graph JSON has this structure:
    - If on a feature branch: `git diff main...HEAD --name-only` (or the base branch)
    - If the user specifies a PR number: get the diff from that PR
 
-3. **Read project metadata only** — use Grep or Read with a line limit to extract just the `"project"` section for context.
+3. **Read project metadata and check graph freshness** — use Grep or Read with a line limit to extract just the `"project"` section for context, including `gitCommitHash`. Run `git rev-parse HEAD` in the project root. If both values exist and differ, warn the user before the diff analysis that the knowledge graph may be stale and impact analysis may miss newer components. Suggest: Run `/understand` to refresh the graph. If git metadata is missing or unavailable, continue with a brief best-effort warning instead of blocking.
 
 4. **Find nodes for changed files** — for each changed file path, use Grep to search the knowledge graph for:
    - Nodes with matching `"filePath"` values (e.g., `grep "changed/file/path"`)

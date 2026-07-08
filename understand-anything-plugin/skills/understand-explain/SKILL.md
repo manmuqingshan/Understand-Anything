@@ -33,23 +33,25 @@ The knowledge graph JSON has this structure:
 
 1. Check that `.understand-anything/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
 
-2. **Find the target node** — use Grep to search the knowledge graph for the component: "$ARGUMENTS"
+2. **Check graph freshness** — read `project.gitCommitHash` from the graph metadata and run `git rev-parse HEAD` in the project root. If both values exist and differ, warn the user before explaining that the knowledge graph may be stale and newer code may be missing from graph-derived context. Suggest: Run `/understand` to refresh the graph. If git metadata is missing or unavailable, continue with a brief best-effort warning instead of blocking.
+
+3. **Find the target node** — use Grep to search the knowledge graph for the component: "$ARGUMENTS"
    - For file paths (e.g., `src/auth/login.ts`): search for `"filePath"` matches
    - For function notation (e.g., `src/auth/login.ts:verifyToken`): search for the function name in `"name"` fields filtered by the file path
    - Note the exact node `id`, `type`, `summary`, `tags`, and `complexity`
 
-3. **Find all connected edges** — Grep for the target node's ID in the edges section:
+4. **Find all connected edges** — Grep for the target node's ID in the edges section:
    - `"source"` matches → things this node calls/imports/depends on (outgoing)
    - `"target"` matches → things that call/import/depend on this node (incoming)
    - Note the connected node IDs and edge types
 
-4. **Read connected nodes** — for each connected node ID from step 3, Grep for those IDs in the nodes section to get their `name`, `summary`, and `type`. This builds the component's neighborhood.
+5. **Read connected nodes** — for each connected node ID from step 4, Grep for those IDs in the nodes section to get their `name`, `summary`, and `type`. This builds the component's neighborhood.
 
-5. **Identify the layer** — Grep for the target node's ID in the `"layers"` section to find which architectural layer it belongs to and that layer's description.
+6. **Identify the layer** — Grep for the target node's ID in the `"layers"` section to find which architectural layer it belongs to and that layer's description.
 
-6. **Read the actual source file** — Read the source file at the node's `filePath` for the deep-dive analysis.
+7. **Read the actual source file** — Read the source file at the node's `filePath` for the deep-dive analysis.
 
-7. **Explain the component in context**:
+8. **Explain the component in context**:
    - Its role in the architecture (which layer, why it exists)
    - Internal structure (functions, classes it contains — from `contains` edges)
    - External connections (what it imports, what calls it, what it depends on — from edges)

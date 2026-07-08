@@ -7,7 +7,12 @@ vi.mock("child_process", () => ({
 
 // Import after mocking
 import { execFileSync } from "child_process";
-import { getChangedFiles, isStale, mergeGraphUpdate } from "../staleness.js";
+import {
+  getChangedFiles,
+  getGraphFreshness,
+  isStale,
+  mergeGraphUpdate,
+} from "../staleness.js";
 
 const mockedExecFileSync = vi.mocked(execFileSync);
 
@@ -106,6 +111,108 @@ describe("isStale", () => {
     expect(result).toEqual({
       stale: false,
       changedFiles: [],
+    });
+  });
+});
+
+describe("getGraphFreshness", () => {
+  it("returns fresh when the graph commit matches HEAD", () => {
+    mockedExecFileSync.mockReturnValue("abc123\n");
+
+    const result = getGraphFreshness("/project", {
+      graphCommitHash: "abc123",
+      lastAnalyzedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result).toEqual({
+      status: "fresh",
+      graphCommitHash: "abc123",
+      headCommitHash: "abc123",
+      changedFileCount: 0,
+      changedFiles: [],
+      commitsBehind: 0,
+      lastAnalyzedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(mockedExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: "/project", encoding: "utf-8" },
+    );
+  });
+
+  it("returns stale with changed file and commit counts when HEAD moved", () => {
+    mockedExecFileSync.mockImplementation((command, args) => {
+      expect(command).toBe("git");
+      if (Array.isArray(args) && args[0] === "rev-parse") return "def456\n";
+      if (Array.isArray(args) && args[0] === "rev-list") return "3\n";
+      if (Array.isArray(args) && args[0] === "diff") {
+        return "src/index.ts\nsrc/auth.ts\n";
+      }
+      throw new Error(`unexpected git args: ${String(args)}`);
+    });
+
+    const result = getGraphFreshness("/project", {
+      graphCommitHash: "abc123",
+      lastAnalyzedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result).toEqual({
+      status: "stale",
+      graphCommitHash: "abc123",
+      headCommitHash: "def456",
+      changedFileCount: 2,
+      changedFiles: ["src/index.ts", "src/auth.ts"],
+      commitsBehind: 3,
+      lastAnalyzedAt: "2026-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("returns unknown when graph metadata has no commit hash", () => {
+    const result = getGraphFreshness("/project", {
+      graphCommitHash: "",
+      lastAnalyzedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result).toEqual({
+      status: "unknown",
+      reason: "missing-graph-commit",
+      lastAnalyzedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(mockedExecFileSync).not.toHaveBeenCalled();
+  });
+
+  it("returns unknown when git HEAD cannot be read", () => {
+    mockedExecFileSync.mockImplementation(() => {
+      throw new Error("fatal: not a git repository");
+    });
+
+    const result = getGraphFreshness("/project", {
+      graphCommitHash: "abc123",
+    });
+
+    expect(result).toEqual({
+      status: "unknown",
+      reason: "git-head-unavailable",
+      graphCommitHash: "abc123",
+    });
+  });
+
+  it("returns unknown when the graph commit cannot be diffed", () => {
+    mockedExecFileSync.mockImplementation((command, args) => {
+      expect(command).toBe("git");
+      if (Array.isArray(args) && args[0] === "rev-parse") return "def456\n";
+      throw new Error("fatal: bad revision");
+    });
+
+    const result = getGraphFreshness("/project", {
+      graphCommitHash: "missing123",
+    });
+
+    expect(result).toEqual({
+      status: "unknown",
+      reason: "graph-commit-unavailable",
+      graphCommitHash: "missing123",
+      headCommitHash: "def456",
     });
   });
 });

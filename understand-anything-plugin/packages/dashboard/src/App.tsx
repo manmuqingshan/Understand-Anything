@@ -15,6 +15,10 @@ import PersonaSelector from "./components/PersonaSelector";
 import ProjectOverview from "./components/ProjectOverview";
 import FileExplorer from "./components/FileExplorer";
 import WarningBanner from "./components/WarningBanner";
+import StalenessBanner, {
+  isGraphFreshnessResult,
+  type GraphFreshnessResult,
+} from "./components/StalenessBanner";
 import TokenGate from "./components/TokenGate";
 import MobileLayout from "./components/MobileLayout";
 import { useIsMobile } from "./hooks/useIsMobile";
@@ -55,6 +59,7 @@ function dataUrl(fileName: string, token: string | null): string {
       "meta.json": import.meta.env.VITE_META_URL,
       "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
       "config.json": import.meta.env.VITE_CONFIG_URL,
+      "staleness.json": import.meta.env.VITE_STALENESS_URL,
     };
     const url = envMap[fileName];
     if (url) return url;
@@ -113,6 +118,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const setDiffOverlay = useDashboardStore((s) => s.setDiffOverlay);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [graphIssues, setGraphIssues] = useState<GraphIssue[]>([]);
+  const [graphFreshness, setGraphFreshness] = useState<GraphFreshnessResult | null>(null);
   const [metaTheme, setMetaTheme] = useState<ThemeConfig | null>(null);
   const [outputLanguage, setOutputLanguage] = useState<string | undefined>();
 
@@ -165,6 +171,17 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setGraph]);
 
   useEffect(() => {
+    fetch(dataUrl("staleness.json", accessToken))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: unknown) => {
+        if (isGraphFreshnessResult(data)) {
+          setGraphFreshness(data);
+        }
+      })
+      .catch(() => {});
+  }, [accessToken]);
+
+  useEffect(() => {
     fetch(dataUrl("diff-overlay.json", accessToken))
       .then((res) => {
         if (!res.ok) return null;
@@ -213,6 +230,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
           accessToken={accessToken}
           loadError={loadError}
           graphIssues={graphIssues}
+          graphFreshness={graphFreshness}
         />
       </ThemeProvider>
     </I18nProvider>
@@ -223,10 +241,12 @@ function DashboardContent({
   accessToken,
   loadError,
   graphIssues,
+  graphFreshness,
 }: {
   accessToken: string;
   loadError: string | null;
   graphIssues: GraphIssue[];
+  graphFreshness: GraphFreshnessResult | null;
 }) {
   const graph = useDashboardStore((s) => s.graph);
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
@@ -435,6 +455,7 @@ function DashboardContent({
         setShowKeyboardHelp={setShowKeyboardHelp}
         loadError={loadError}
         allIssues={allIssues}
+        graphFreshness={graphFreshness}
         shortcuts={shortcuts}
       />
     );
@@ -620,6 +641,9 @@ function DashboardContent({
 
       {/* Search */}
       <SearchBar />
+
+      {/* Graph freshness warning banner */}
+      {!loadError && <StalenessBanner freshness={graphFreshness} />}
 
       {/* Validation warning banner */}
       {allIssues.length > 0 && !loadError && (
