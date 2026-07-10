@@ -144,6 +144,21 @@ describe('scan-project.mjs — language detection', () => {
     expect(byPath(r.output, 'g.swift').language).toBe('swift');
   });
 
+  it('maps Scala extensions to scala (with .sbt categorized as config)', () => {
+    projectRoot = setupTree({
+      'src/main/scala/App.scala': 'object App\n',
+      'scripts/task.sc': 'println(1)\n',
+      'build.sbt': 'name := "demo"\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/main/scala/App.scala').language).toBe('scala');
+    expect(byPath(r.output, 'src/main/scala/App.scala').fileCategory).toBe('code');
+    expect(byPath(r.output, 'scripts/task.sc').language).toBe('scala');
+    expect(byPath(r.output, 'build.sbt').language).toBe('scala');
+    expect(byPath(r.output, 'build.sbt').fileCategory).toBe('config');
+  });
+
   it('maps Ruby, PHP, C, C++ to their language ids', () => {
     projectRoot = setupTree({
       'a.rb': 'puts 1\n',

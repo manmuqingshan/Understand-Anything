@@ -480,9 +480,12 @@ async function buildResolutionContext(projectRoot, files) {
   }
 
   // Build per-extension suffix indices for dotted-FQN resolvers (Java,
-  // Kotlin, C#). Indexed once; reused for every import dispatch.
+  // Kotlin, Scala, C#). Indexed once; reused for every import dispatch.
   const javaIndex = buildSuffixIndex(files, p => p.endsWith('.java'));
   const kotlinIndex = buildSuffixIndex(files, p => p.endsWith('.kt'));
+  const scalaFilePredicate = p => p.endsWith('.scala') || p.endsWith('.sc');
+  const scalaIndex = buildSuffixIndex(files, scalaFilePredicate);
+  const scalaPackageIndex = buildPackageIndex(files, scalaFilePredicate);
   const csIndex = buildSuffixIndex(files, p => p.endsWith('.cs'));
   const swiftModuleIndex = buildSwiftModuleIndex(files, swiftResult.targets);
 
@@ -494,6 +497,8 @@ async function buildResolutionContext(projectRoot, files) {
     goFilesByDir,
     javaIndex,
     kotlinIndex,
+    scalaIndex,
+    scalaPackageIndex,
     csIndex,
     swiftModuleIndex,
     phpAutoloads,
@@ -1022,6 +1027,27 @@ function buildSuffixIndex(files, extPredicate) {
   return idx;
 }
 
+function buildPackageIndex(files, extPredicate) {
+  const idx = new Map();
+  for (const f of files) {
+    const p = toPosix(f.path);
+    if (!extPredicate(p)) continue;
+    const dir = dirOf(p);
+    if (!dir) continue;
+
+    const parts = dir.split('/');
+    for (let i = 0; i < parts.length; i++) {
+      const suffix = parts.slice(i).join('/');
+      if (!idx.has(suffix)) idx.set(suffix, []);
+      idx.get(suffix).push(p);
+    }
+  }
+  for (const arr of idx.values()) {
+    arr.sort((a, b) => a.localeCompare(b));
+  }
+  return idx;
+}
+
 const SWIFT_SOURCE_ROOT_DIRS = new Set(['source', 'sources', 'test', 'tests']);
 const SWIFT_MODULE_CONTAINER_DIRS = new Set([
   'framework',
@@ -1141,6 +1167,84 @@ export function resolveJavaImport(rawImport, _file, ctx) {
 
 export function resolveKotlinImport(rawImport, _file, ctx) {
   return resolveDottedFqn(rawImport, '.kt', ctx.kotlinIndex);
+}
+
+// ---------------------------------------------------------------------------
+// Scala resolver
+//
+// Scala imports come from the core ScalaExtractor in three shapes:
+//   - plain:    `import com.example.Foo`      -> source='com.example.Foo',
+//                                                specifiers=['Foo']
+//   - selector: `import com.example.{A, B}`   -> source='com.example',
+//                                                specifiers=['A', 'B']
+//   - wildcard: `import com.example._` / `.*` -> source='com.example',
+//                                                specifiers=['*']
+//
+// The plain source resolves like Java (`com/example/Foo.scala` suffix probe).
+// Selector lists probe each specifier under the source package. Scala also
+// allows package objects (`com/example/package.scala`) to hold members, so
+// the package prefix is additionally probed against `<pkg>/package.scala`.
+// Multi-type files (a `model.scala` holding many case classes) can't be
+// resolved by name probing — same accepted limitation as Java/Kotlin/C#.
+// ---------------------------------------------------------------------------
+
+export function resolveScalaImport(rawImport, specifiers, _file, ctx) {
+  const out = new Set();
+  const specs = Array.isArray(specifiers) ? specifiers : [];
+  const isPlain =
+    specs.length === 1 &&
+    specs[0] &&
+    specs[0] !== '*' &&
+    rawImport.endsWith(`.${specs[0]}`);
+
+  if (specs.includes('*')) {
+    for (const m of resolveScalaPackage(rawImport, ctx)) out.add(m);
+    return [...out].sort((a, b) => a.localeCompare(b));
+  }
+
+  if (isPlain) {
+    for (const m of resolveScalaDottedFqn(rawImport, ctx)) out.add(m);
+    if (out.size === 0) {
+      const pkg = rawImport.slice(0, -(specs[0].length + 1));
+      for (const m of resolveScalaDottedFqn(`${pkg}.package`, ctx)) out.add(m);
+    }
+    return [...out].sort((a, b) => a.localeCompare(b));
+  }
+
+  let unresolvedSelector = false;
+  for (const spec of specs) {
+    if (!spec) continue;
+    const matches = resolveScalaDottedFqn(`${rawImport}.${spec}`, ctx);
+    if (matches.length === 0) unresolvedSelector = true;
+    for (const m of matches) out.add(m);
+  }
+
+  if (unresolvedSelector) {
+    for (const m of resolveScalaDottedFqn(`${rawImport}.package`, ctx)) out.add(m);
+  }
+
+  return [...out].sort((a, b) => a.localeCompare(b));
+}
+
+function resolveScalaDottedFqn(fqn, ctx) {
+  return [
+    ...resolveDottedFqn(fqn, '.scala', ctx.scalaIndex),
+    ...resolveDottedFqn(fqn, '.sc', ctx.scalaIndex),
+  ];
+}
+
+function resolveScalaPackage(pkg, ctx) {
+  if (!pkg || typeof pkg !== 'string') return [];
+  const dirPart = pkg.replace(/\.\*$/, '').replace(/\./g, '/');
+  const matches = ctx.scalaPackageIndex.get(dirPart);
+  return matches ? [...matches].sort(compareScalaPackageMembers) : [];
+}
+
+function compareScalaPackageMembers(a, b) {
+  const aPackage = /\/package\.s(?:cala|c)$/.test(a);
+  const bPackage = /\/package\.s(?:cala|c)$/.test(b);
+  if (dirOf(a) === dirOf(b) && aPackage !== bPackage) return aPackage ? 1 : -1;
+  return a.localeCompare(b);
 }
 
 // ---------------------------------------------------------------------------
@@ -1639,6 +1743,9 @@ function resolveImport(imp, file, ctx) {
   if (lang === 'kotlin') {
     return resolveKotlinImport(src, file, ctx);
   }
+  if (lang === 'scala') {
+    return resolveScalaImport(src, imp.specifiers, file, ctx);
+  }
   if (lang === 'csharp') {
     return resolveCSharpImport(src, file, ctx);
   }
@@ -1803,7 +1910,11 @@ async function main() {
           }
         }
       }
-      resolved = [...resolvedSet].sort((a, b) => a.localeCompare(b));
+      resolved = [...resolvedSet].sort((a, b) =>
+        file.language === 'scala'
+          ? compareScalaPackageMembers(a, b)
+          : a.localeCompare(b),
+      );
     } catch (err) {
       process.stderr.write(
         `Warning: extract-import-map: import resolution failed for ${path} ` +

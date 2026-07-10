@@ -98,7 +98,7 @@ The script:
 | `LICENSE` | `code` (exception — not docs) |
 | `Dockerfile`, `Dockerfile.*`, `docker-compose.*`, `compose.yml`/`compose.yaml`, `Makefile`, `Jenkinsfile`, `Procfile`, `Vagrantfile`, `.gitlab-ci.yml`, `.dockerignore`, `.github/workflows/*`, `.circleci/*`, paths in `k8s/` or `kubernetes/`, `*.k8s.yml`/`*.k8s.yaml` | `infra` |
 | `.md`, `.mdx`, `.rst`, `.txt`, `.text` (except `LICENSE`) | `docs` |
-| `.yaml`, `.yml`, `.json`, `.jsonc`, `.toml`, `.xml`, `.xsl`, `.xsd`, `.plist`, `.cfg`, `.ini`, `.env`, `.properties`, `.csproj`, `.sln`, `.mod`, `.sum`, `.gradle` | `config` |
+| `.yaml`, `.yml`, `.json`, `.jsonc`, `.toml`, `.xml`, `.xsl`, `.xsd`, `.plist`, `.cfg`, `.ini`, `.env`, `.properties`, `.csproj`, `.sln`, `.mod`, `.sum`, `.gradle`, `.sbt` | `config` |
 | `.tf`, `.tfvars` | `infra` |
 | `.sql`, `.graphql`, `.gql`, `.proto`, `.prisma`, `.csv`, `.tsv` | `data` |
 | `.sh`, `.bash`, `.zsh`, `.ps1`, `.psm1`, `.psd1`, `.bat`, `.cmd` | `script` |
@@ -159,7 +159,7 @@ Read the output JSON and merge the `importMap` field directly into your final sc
 
 **Capture stderr** when you run the bundled script. Any line starting with `Warning:` should be appended to phase warnings — the SKILL.md orchestrator captures these for the final report. The script also writes a one-line summary `extract-import-map: filesScanned=… filesWithImports=… totalEdges=…` on completion; you can ignore that line or surface it as informational.
 
-**Languages supported.** The bundled script natively handles import resolution for: TypeScript, JavaScript (including CJS `require()`), Python (relative + absolute + `__init__.py`), Go (go.mod prefix stripping), Rust (`use crate::`, `use super::`, `use self::`, and `mod x;` declarations), Java, Kotlin, C#, Ruby (`require` + `require_relative`), PHP (composer.json PSR-4 autoload), C, and C++ (`#include` with relative + include/ + src/ probes). Languages outside this set get empty arrays — there is no LLM-based fallback.
+**Languages supported.** The bundled script natively handles import resolution for: TypeScript, JavaScript (including CJS `require()`), Python (relative + absolute + `__init__.py`), Go (go.mod prefix stripping), Rust (`use crate::`, `use super::`, `use self::`, and `mod x;` declarations), Java, Kotlin, Scala (dotted FQN + selector lists + package objects), C#, Ruby (`require` + `require_relative`), PHP (composer.json PSR-4 autoload), C, and C++ (`#include` with relative + include/ + src/ probes). Languages outside this set get empty arrays — there is no LLM-based fallback.
 
 ---
 
@@ -221,7 +221,7 @@ Then assemble the final output JSON:
 - ALWAYS validate that `totalFiles` matches the actual length of the `files` array.
 - Trust Step B for file enumeration + language detection + category assignment + line counts + complexity. Trust Step C for `importMap`. Your only synthesis is the `description` field (plus the Step A narrative fields: `name`, `frameworks`, `languages`).
 - Do NOT re-implement file enumeration, language detection, or category assignment in your discovery script. Use the bundled `scan-project.mjs`. If the table doesn't cover your project type, file an issue rather than ad-hoc handling.
-- Do NOT attempt to re-implement import resolution. The bundled `extract-import-map.mjs` handles all 12 supported code languages (TS, JS, Python, Go, Rust, Java, Kotlin, C#, Ruby, PHP, C, C++) deterministically via tree-sitter + per-language resolvers.
+- Do NOT attempt to re-implement import resolution. The bundled `extract-import-map.mjs` handles all 13 supported code languages (TS, JS, Python, Go, Rust, Java, Kotlin, Scala, C#, Ruby, PHP, C, C++) deterministically via tree-sitter + per-language resolvers.
 - Every file MUST have a `fileCategory` field with one of: `code`, `config`, `docs`, `infra`, `data`, `script`, `markup` — `scan-project.mjs` guarantees this; just don't strip it.
 
 ## Writing Results

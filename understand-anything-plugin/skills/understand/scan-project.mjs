@@ -113,12 +113,15 @@ const LANGUAGE_BY_EXT = Object.freeze({
   // Python
   '.py': 'python',
   '.pyi': 'python',
-  // Go / Rust / Java / Kotlin / C# / Swift / Lua
+  // Go / Rust / Java / Kotlin / Scala / C# / Swift / Lua
   '.go': 'go',
   '.rs': 'rust',
   '.java': 'java',
   '.kt': 'kotlin',
   '.kts': 'kotlin',
+  '.scala': 'scala',
+  '.sc': 'scala',
+  '.sbt': 'scala',
   '.cs': 'csharp',
   '.swift': 'swift',
   '.lua': 'lua',
@@ -308,6 +311,7 @@ const CATEGORY_BY_EXT = Object.freeze({
   '.mod': 'config',
   '.sum': 'config',
   '.gradle': 'config',
+  '.sbt': 'config',
   // infra
   '.tf': 'infra',
   '.tfvars': 'infra',

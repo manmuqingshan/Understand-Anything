@@ -49,10 +49,10 @@ describe("LanguageRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 41 built-in language configs", () => {
+    it("registers all 42 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(41);
+      expect(all.length).toBe(42);
     });
 
     it("maps all expected extensions", () => {
@@ -66,6 +66,7 @@ describe("LanguageRegistry", () => {
       expect(registry.getByExtension(".php")?.id).toBe("php");
       expect(registry.getByExtension(".swift")?.id).toBe("swift");
       expect(registry.getByExtension(".kt")?.id).toBe("kotlin");
+      expect(registry.getByExtension(".scala")?.id).toBe("scala");
       expect(registry.getByExtension(".cs")?.id).toBe("csharp");
       expect(registry.getByExtension(".cpp")?.id).toBe("cpp");
       expect(registry.getByExtension(".c")?.id).toBe("c");

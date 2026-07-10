@@ -109,6 +109,12 @@ class IsTestPathTests(unittest.TestCase):
         self.assertTrue(mbg.is_test_path("src/test/kotlin/com/foo/BarTest.kt"))
         self.assertTrue(mbg.is_test_path("src/test/kotlin/com/foo/BarTests.kt"))
 
+    def test_scala_test_files(self) -> None:
+        self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarSpec.scala"))
+        self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarSuite.scala"))
+        self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTest.scala"))
+        self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTests.scala"))
+
     def test_csharp_test_files(self) -> None:
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTests.cs"))
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTest.cs"))
@@ -206,6 +212,14 @@ class ProductionCandidatesTests(unittest.TestCase):
         cands = mbg.production_candidates("src/test/kotlin/com/foo/BarTest.kt")
         self.assertIn("src/main/kotlin/com/foo/Bar.kt", cands)
 
+    def test_scala_sbt_layout(self) -> None:
+        cands = mbg.production_candidates("src/test/scala/com/foo/BarSpec.scala")
+        self.assertIn("src/main/scala/com/foo/Bar.scala", cands)
+
+    def test_scala_multimodule_sbt_layout(self) -> None:
+        cands = mbg.production_candidates("modules/core/src/test/scala/com/foo/BarSpec.scala")
+        self.assertIn("modules/core/src/main/scala/com/foo/Bar.scala", cands)
+
     def test_js_ts_test_subdir_walkout(self) -> None:
         # Some JS/TS projects use `<dir>/test/` or `<dir>/spec/` instead of
         # the more idiomatic `__tests__/`. Walk out of either.
@@ -298,6 +312,54 @@ class LinkTestsTests(unittest.TestCase):
         self.assertIn("tested", nodes_by_id["file:src/foo.ts"]["tags"])
         # Test node is not tagged with "tested"
         self.assertNotIn("tested", nodes_by_id["file:src/foo.test.ts"]["tags"])
+
+    def test_scala_sbt_pairing_emits_forward_edge(self) -> None:
+        nodes_by_id = {
+            "file:src/main/scala/com/foo/Bar.scala": _file_node(
+                "src/main/scala/com/foo/Bar.scala",
+            ),
+            "file:src/test/scala/com/foo/BarSpec.scala": _file_node(
+                "src/test/scala/com/foo/BarSpec.scala",
+            ),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual(added, 1)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(tagged, 1)
+        self.assertEqual(swapped, 0)
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["source"], "file:src/main/scala/com/foo/Bar.scala")
+        self.assertEqual(edges[0]["target"], "file:src/test/scala/com/foo/BarSpec.scala")
+
+    def test_scala_multimodule_sbt_pairing_emits_forward_edge(self) -> None:
+        nodes_by_id = {
+            "file:modules/core/src/main/scala/com/foo/Bar.scala": _file_node(
+                "modules/core/src/main/scala/com/foo/Bar.scala",
+            ),
+            "file:modules/core/src/test/scala/com/foo/BarSpec.scala": _file_node(
+                "modules/core/src/test/scala/com/foo/BarSpec.scala",
+            ),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual(added, 1)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(tagged, 1)
+        self.assertEqual(swapped, 0)
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(
+            edges[0]["source"],
+            "file:modules/core/src/main/scala/com/foo/Bar.scala",
+        )
+        self.assertEqual(
+            edges[0]["target"],
+            "file:modules/core/src/test/scala/com/foo/BarSpec.scala",
+        )
 
     def test_no_production_counterpart_no_edge(self) -> None:
         nodes_by_id = {
