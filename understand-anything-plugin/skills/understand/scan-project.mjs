@@ -16,7 +16,9 @@
  *
  * What this script owns:
  *   - File enumeration (git ls-files preferred, recursive walk fallback)
- *   - `.understandignore` filtering (delegated to core's createIgnoreFilter)
+ *   - `.understandignore` filtering (delegated to core's createIgnoreFilter,
+ *     which reads the resolved data dir — `.ua/`, or legacy
+ *     `.understand-anything/` when that directory already exists)
  *   - Per-file language detection (extension + filename table)
  *   - Per-file category assignment (priority-ordered rules from
  *     project-scanner.md Step 4)
@@ -81,7 +83,7 @@ try {
   core = await import(pathToFileURL(resolve(pluginRoot, 'packages/core/dist/index.js')).href);
 }
 
-const { createIgnoreFilter } = core;
+const { createIgnoreFilter, resolveUaDir } = core;
 
 // ---------------------------------------------------------------------------
 // Language detection
@@ -602,11 +604,15 @@ function buildDefaultsOnlyFilter() {
  * Determine whether `projectRoot` has any user .understandignore files.
  * When neither file exists, the combined and defaults-only filters are
  * identical, so we can skip the dual-filter accounting entirely.
+ *
+ * Mirrors core's createIgnoreFilter, which reads the resolved data dir —
+ * `.ua/`, or legacy `.understand-anything/` when that directory already
+ * exists (see resolveUaDir).
  */
 function hasUserIgnoreFile(projectRoot) {
   return (
     existsSync(join(projectRoot, '.understandignore'))
-    || existsSync(join(projectRoot, '.understand-anything', '.understandignore'))
+    || existsSync(join(resolveUaDir(projectRoot), '.understandignore'))
   );
 }
 
