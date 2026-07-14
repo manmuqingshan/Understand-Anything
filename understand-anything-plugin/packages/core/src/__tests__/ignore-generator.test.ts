@@ -222,6 +222,11 @@ describe("generateStarterIgnoreFile", () => {
       expect(content).toContain("# **/tests.py");
     });
 
+    it("includes pytest conftest.py convention", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# **/conftest.py");
+    });
+
     it("groups patterns under the JS / TS sub-header", () => {
       const content = generateStarterIgnoreFile(testDir);
       expect(content).toContain("# JS / TS");
